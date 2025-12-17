@@ -48,8 +48,13 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
           cd MLProject
+
+          RUN_ID=$(ls mlruns/*/*/artifacts/model -d | tail -n 1 | awk -F'/' '{print $2}')
+
+          echo "Using RUN_ID: $RUN_ID"
+
           mlflow models build-docker \
-          -m runs:/$MLFLOW_RUN_ID/model \
-          -n $DOCKER_USERNAME/breast-cancer-mlflow
+            -m runs:/$RUN_ID/model \
+            -n $DOCKER_USERNAME/breast-cancer-mlflow
           
           docker push $DOCKER_USERNAME/breast-cancer-mlflow
