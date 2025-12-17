@@ -2,7 +2,7 @@ name: MLflow CI Retraining
 
 permissions:
   contents: write
-  
+
 on:
   push:
     branches:
@@ -22,20 +22,22 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install MLflow
+      - name: Install Dependencies
         run: |
-          pip install mlflow
+          pip install mlflow pandas
 
       - name: Run MLflow Project
         run: |
           cd MLProject
+          # Pastikan experiment id konsisten, default biasanya '0'
           mlflow run . --env-manager=local
 
       - name: Save MLflow artifacts
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-
+          
+          # Gunakan path relatif yang aman
           git add MLProject/mlruns || true
           git commit -m "Add MLflow artifacts (CI)" || echo "No changes"
           git push
@@ -46,15 +48,21 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
-
+          
           cd MLProject
 
-          RUN_ID=$(ls mlruns/*/*/artifacts/model -d | tail -n 1 | awk -F'/' '{print $2}')
-
-          echo "Using RUN_ID: $RUN_ID"
-
-          mlflow models build-docker \
-            -m runs:/$RUN_ID/model \
-            -n $DOCKER_USERNAME/breast-cancer-mlflow
+          RUN_ID=$(python -c "import mlflow; runs = mlflow.search_runs(experiment_ids=['0'], order_by=['start_time desc'], max_results=1); print(runs.iloc[0].run_id)")
           
-          docker push $DOCKER_USERNAME/breast-cancer-mlflow
+          echo "Detected RUN_ID: $RUN_ID"
+          
+          if [ -z "$RUN_ID" ]; then
+            echo "Error: RUN_ID is empty. MLflow run failed or not found."
+            exit 1
+          fi
+
+          # Build docker image dengan ID yang valid
+          mlflow models build-docker \
+            -m "runs:/$RUN_ID/model" \
+            -n "$DOCKER_USERNAME/breast-cancer-mlflow"
+          
+          docker push "$DOCKER_USERNAME/breast-cancer-mlflow"
