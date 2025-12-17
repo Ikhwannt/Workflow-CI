@@ -49,7 +49,7 @@ jobs:
 
           cd MLProject
           mlflow models build-docker \
-            -m runs:/latest/model \
-            -n $DOCKER_USERNAME/breast-cancer-mlflow
+          -m runs:/$MLFLOW_RUN_ID/model \
+          -n $DOCKER_USERNAME/breast-cancer-mlflow
           
           docker push $DOCKER_USERNAME/breast-cancer-mlflow
