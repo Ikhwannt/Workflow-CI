@@ -1,0 +1,55 @@
+name: MLflow CI Retraining
+
+permissions:
+  contents: write
+  
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install MLflow
+        run: |
+          pip install mlflow
+
+      - name: Run MLflow Project
+        run: |
+          cd MLProject
+          mlflow run .
+
+      - name: Save MLflow artifacts
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+          git add MLProject/mlruns || true
+          git commit -m "Add MLflow artifacts (CI)" || echo "No changes"
+          git push
+
+      - name: Build Docker Image
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+          cd MLProject
+          mlflow models build-docker \
+            -m runs:/latest/model \
+            -n $DOCKER_USERNAME/breast-cancer-mlflow
+          
+          docker push $DOCKER_USERNAME/breast-cancer-mlflow
